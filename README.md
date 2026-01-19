@@ -1,4 +1,4 @@
-<h1 align="center">Maestro</h1>
+ <h1 align="center">Maestro</h1>
 <p align="center"><b>Laravel Starter Kit Orchestrator</b></p>
 
 ## Contributing
@@ -18,7 +18,12 @@ Inertia    # Inertia-based starter kits
 Livewire # Livewire-based starter kits
 ```
 
-## Building a starter kit
+## Orhcestrator
+
+The `orchestrator` is a simple Laravel application that's responsible for building and running the
+starter kits, so you can test and validate your changes.
+
+### Building a starter kit
 
 In order to validate and test your changes, you'll need to build the starter kit you're changing.
 Use this command to build:
@@ -39,7 +44,7 @@ When building a **WorkOS** variant for a starter kit, you can add your **WorkOS*
 API key in the root `.env` file, with this, when running `composer kit:run`, it will copy these
 values to the built starter kit.
 
-## Running the built starter kit
+### Running the built starter kit
 
 You can use this command to run the built starter kit at `http://localhost:8000` with hot-reloading enabled:
 
@@ -47,4 +52,4 @@ You can use this command to run the built starter kit at `http://localhost:8000`
 composer kit:run
 ```
 
-This will start both the development server and a file watcher that automatically copies changes from the kit folders to the build directory.
+This will start both the development server and a file watcher that automatically copies changes from the kit folders to the `build` directory outside the `orchestrator` directory.

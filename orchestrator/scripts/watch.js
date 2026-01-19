@@ -7,10 +7,11 @@ import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const rootDir = path.dirname(__dirname);
+const orchestratorDir = path.dirname(__dirname);
+const rootDir = path.dirname(orchestratorDir);
 const kitsDir = path.join(rootDir, 'kits');
 const buildDir = path.join(rootDir, 'build');
-const starterKitFile = path.join(rootDir, 'storage', 'app', 'private', 'starter_kit');
+const starterKitFile = path.join(orchestratorDir, 'storage', 'app', 'private', 'starter_kit');
 
 const colors = {
     reset: '\x1b[0m',

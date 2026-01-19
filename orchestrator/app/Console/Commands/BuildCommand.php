@@ -15,9 +15,28 @@ use function Laravel\Prompts\select;
 class BuildCommand extends Command
 {
     /**
-     * The path where the starter kit will be built.
+     * Get the root directory of the maestro project (parent of orchestrator).
      */
-    protected const string BUILD_PATH = 'build';
+    protected function maestroRoot(): string
+    {
+        return dirname(base_path());
+    }
+
+    /**
+     * Get the path where the starter kit will be built.
+     */
+    protected function buildPath(): string
+    {
+        return $this->maestroRoot().'/build';
+    }
+
+    /**
+     * Get the path to a kit directory.
+     */
+    protected function kitPath(string $path = ''): string
+    {
+        return $this->maestroRoot().'/kits'.($path ? '/'.$path : '');
+    }
 
     /**
      * The name and signature of the console command.
@@ -125,7 +144,7 @@ class BuildCommand extends Command
      */
     protected function prepareBuildDirectory(string $basePath): string
     {
-        $buildPath = base_path(self::BUILD_PATH);
+        $buildPath = $this->buildPath();
 
         if (File::exists($buildPath)) {
             File::deleteDirectory($buildPath);
@@ -158,7 +177,7 @@ class BuildCommand extends Command
      */
     protected function buildLivewireKit(bool $workos = false, bool $components = false): int
     {
-        $buildPath = $this->prepareBuildDirectory(base_path('kits/Livewire/Base'));
+        $buildPath = $this->prepareBuildDirectory($this->kitPath('Livewire/Base'));
 
         if ($workos) {
             $this->applyWorkosVariant($buildPath, 'Livewire');
@@ -174,10 +193,10 @@ class BuildCommand extends Command
      */
     protected function buildInertiaKit(string $kit, bool $workos = false): int
     {
-        $buildPath = $this->prepareBuildDirectory(base_path('kits/Inertia/Base'));
+        $buildPath = $this->prepareBuildDirectory($this->kitPath('Inertia/Base'));
 
         info("Copying {$kit} kit files...");
-        File::copyDirectory(base_path("kits/Inertia/{$kit}"), $buildPath);
+        File::copyDirectory($this->kitPath("Inertia/{$kit}"), $buildPath);
 
         if ($workos) {
             $this->applyWorkosVariant($buildPath, $kit);
@@ -263,13 +282,13 @@ class BuildCommand extends Command
     protected function applyWorkosVariant(string $buildPath, string $kit): void
     {
         if ($kit === 'Livewire') {
-            $workosPath = base_path('kits/Livewire/WorkOS');
+            $workosPath = $this->kitPath('Livewire/WorkOS');
 
             info('Copying WorkOS files...');
             File::copyDirectory($workosPath, $buildPath);
         } else {
-            $workosBasePath = base_path('kits/Inertia/WorkOS/Base');
-            $workosKitPath = base_path("kits/Inertia/WorkOS/{$kit}");
+            $workosBasePath = $this->kitPath('Inertia/WorkOS/Base');
+            $workosKitPath = $this->kitPath("Inertia/WorkOS/{$kit}");
 
             info('Copying WorkOS Base files...');
             File::copyDirectory($workosBasePath, $buildPath);
@@ -293,7 +312,7 @@ class BuildCommand extends Command
      */
     protected function applyComponentsVariant(string $buildPath): void
     {
-        $componentsPath = base_path('kits/Livewire/Components');
+        $componentsPath = $this->kitPath('Livewire/Components');
 
         info('Relocating auth views for Components variant...');
         $this->relocateAuthViewsForComponents($buildPath);
