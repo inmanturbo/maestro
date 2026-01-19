@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useActiveUrl } from '@/hooks/use-active-url';
 import { cn, toUrl } from '@/lib/utils';
-import { appearance } from '@/routes';
+import { edit as editAppearance } from '@/routes/appearance';
 import { edit } from '@/routes/profile';
 import { type NavItem } from '@/types';
 
@@ -18,7 +18,7 @@ const sidebarNavItems: NavItem[] = [
     },
     {
         title: 'Appearance',
-        href: appearance(),
+        href: editAppearance(),
         icon: null,
     },
 ];

@@ -75,7 +75,7 @@ function updateEnvValue(envPath, key, value) {
  */
 function configureEnv() {
     const buildEnvPath = path.join(buildDir, '.env');
-    const rootEnvPath = path.join(rootDir, '.env');
+    const orchestratorEnvPath = path.join(orchestratorDir, '.env');
 
     if (!fs.existsSync(buildEnvPath)) {
         return;
@@ -83,12 +83,12 @@ function configureEnv() {
 
     updateEnvValue(buildEnvPath, 'APP_URL', 'http://localhost:8000');
 
-    if (fs.existsSync(rootEnvPath)) {
-        const workosClientId = readEnvValue(rootEnvPath, 'WORKOS_CLIENT_ID');
-        const workosApiKey = readEnvValue(rootEnvPath, 'WORKOS_API_KEY');
+    if (fs.existsSync(orchestratorEnvPath)) {
+        const workosClientId = readEnvValue(orchestratorEnvPath, 'WORKOS_CLIENT_ID');
+        const workosApiKey = readEnvValue(orchestratorEnvPath, 'WORKOS_API_KEY');
 
         if (workosClientId && workosApiKey) {
-            log('Copying WorkOS credentials from root .env...', 'blue');
+            log('Copying WorkOS credentials from orchestrator .env...', 'blue');
             updateEnvValue(buildEnvPath, 'WORKOS_CLIENT_ID', workosClientId);
             updateEnvValue(buildEnvPath, 'WORKOS_API_KEY', workosApiKey);
         }
