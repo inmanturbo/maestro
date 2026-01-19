@@ -24,7 +24,10 @@ class BuildCommand extends Command
      *
      * @var string
      */
-    protected $signature = 'build {--kit= : The starter kit to build (Livewire, React, or Vue)} {--workos : Build the WorkOS variant}';
+    protected $signature = 'build
+                            {--kit= : The starter kit to build (Livewire, React, or Vue)}
+                            {--workos : Build the WorkOS variant}
+                            {--components : Build the Livewire Components variant}';
 
     /**
      * The console command description.
@@ -55,20 +58,50 @@ class BuildCommand extends Command
         }
 
         $workos = $this->option('workos');
+        $components = $this->option('components');
 
-        if (! $workos && ! $this->option('kit')) {
-            $workos = confirm(
-                label: 'Would you like to build the WorkOS variant?',
-                default: false,
-            );
+        if ($components && $kit !== 'Livewire') {
+            $components = false;
         }
 
-        $variantLabel = $workos ? "{$kit} (WorkOS)" : $kit;
+        if ($workos) {
+            $components = false;
+        }
+
+        if (! $this->option('kit')) {
+            if ($kit === 'Livewire' && ! $workos && ! $components) {
+                $components = confirm(
+                    label: 'Would you like to build the Components variant?',
+                    default: false,
+                );
+            }
+
+            if (! $workos && ! $components) {
+                $workos = confirm(
+                    label: 'Would you like to build the WorkOS variant?',
+                    default: false,
+                );
+            }
+        }
+
+        $variantLabel = $this->getVariantLabel($kit, $workos, $components);
         info("Building {$variantLabel} starter kit...");
 
         return $kit === 'Livewire'
-            ? $this->buildLivewireKit($workos)
+            ? $this->buildLivewireKit($workos, $components)
             : $this->buildInertiaKit($kit, $workos);
+    }
+
+    /**
+     * Get the variant label for display.
+     */
+    protected function getVariantLabel(string $kit, bool $workos, bool $components): string
+    {
+        return match (true) {
+            $workos => "{$kit} (WorkOS)",
+            $components => "{$kit} (Components)",
+            default => $kit,
+        };
     }
 
     /**
@@ -108,12 +141,12 @@ class BuildCommand extends Command
     /**
      * Finalize the build by writing metadata and showing success message.
      */
-    protected function finalizeBuild(string $buildPath, string $kit, bool $workos): int
+    protected function finalizeBuild(string $buildPath, string $kit, bool $workos, bool $components = false): int
     {
-        $this->writeStarterKitFile($buildPath, $kit, $workos);
+        $this->writeStarterKitFile($kit, $workos, $components);
         $this->deleteDatabaseFile($buildPath);
 
-        $variantLabel = $workos ? "{$kit} (WorkOS)" : $kit;
+        $variantLabel = $this->getVariantLabel($kit, $workos, $components);
         info("{$variantLabel} starter kit built successfully in the 'build' folder.");
         info("Run './run-kit.sh' to start the development server.");
 
@@ -123,15 +156,17 @@ class BuildCommand extends Command
     /**
      * Build the Livewire starter kit.
      */
-    protected function buildLivewireKit(bool $workos = false): int
+    protected function buildLivewireKit(bool $workos = false, bool $components = false): int
     {
         $buildPath = $this->prepareBuildDirectory(base_path('kits/Livewire/Base'));
 
         if ($workos) {
             $this->applyWorkosVariant($buildPath, 'Livewire');
+        } elseif ($components) {
+            $this->applyComponentsVariant($buildPath);
         }
 
-        return $this->finalizeBuild($buildPath, 'Livewire', $workos);
+        return $this->finalizeBuild($buildPath, 'Livewire', $workos, $components);
     }
 
     /**
@@ -254,6 +289,66 @@ class BuildCommand extends Command
     }
 
     /**
+     * Apply the Components variant modifications for Livewire.
+     */
+    protected function applyComponentsVariant(string $buildPath): void
+    {
+        $componentsPath = base_path('kits/Livewire/Components');
+
+        info('Relocating auth views for Components variant...');
+        $this->relocateAuthViewsForComponents($buildPath);
+
+        info('Copying Components files...');
+        File::copyDirectory($componentsPath, $buildPath);
+
+        info('Updating FortifyServiceProvider...');
+        $this->updateFortifyServiceProviderForComponents($buildPath);
+    }
+
+    /**
+     * Relocate auth views for the Components variant.
+     */
+    protected function relocateAuthViewsForComponents(string $buildPath): void
+    {
+        $pagesPath = $buildPath.'/resources/views/pages';
+        $settingsLayoutSource = $pagesPath.'/settings/layout.blade.php';
+        $settingsLayoutDest = $buildPath.'/resources/views/components/settings/layout.blade.php';
+
+        if (File::exists($settingsLayoutSource)) {
+            File::ensureDirectoryExists(dirname($settingsLayoutDest));
+            File::copy($settingsLayoutSource, $settingsLayoutDest);
+        }
+
+        $authSource = $pagesPath.'/auth';
+        $authDest = $buildPath.'/resources/views/livewire/auth';
+
+        if (File::exists($authSource)) {
+            File::ensureDirectoryExists($authDest);
+            File::copyDirectory($authSource, $authDest);
+        }
+
+        if (File::exists($pagesPath)) {
+            File::deleteDirectory($pagesPath);
+        }
+    }
+
+    /**
+     * Update FortifyServiceProvider for the Components variant.
+     */
+    protected function updateFortifyServiceProviderForComponents(string $buildPath): void
+    {
+        $fortifyPath = $buildPath.'/app/Providers/FortifyServiceProvider.php';
+
+        if (! File::exists($fortifyPath)) {
+            return;
+        }
+
+        $content = File::get($fortifyPath);
+        $content = str_replace('pages::auth.', 'livewire.auth.', $content);
+        File::put($fortifyPath, $content);
+    }
+
+    /**
      * Remove files listed in the workos.ignore config.
      */
     protected function removeIgnoredFiles(string $buildPath, string $kit): void
@@ -343,11 +438,13 @@ PHP;
     /**
      * Write the starter kit identifier file.
      */
-    protected function writeStarterKitFile(string $buildPath, string $kit, bool $workos): void
+    protected function writeStarterKitFile(string $kit, bool $workos, bool $components = false): void
     {
         $starterKit = strtolower($kit);
         if ($workos) {
             $starterKit .= '-workos';
+        } elseif ($components) {
+            $starterKit .= '-components';
         }
 
         Storage::disk('local')->put('starter_kit', $starterKit);
