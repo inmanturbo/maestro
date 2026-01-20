@@ -5,39 +5,13 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
-use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\select;
 
 class BuildCommand extends Command
 {
-    /**
-     * Get the root directory of the maestro project (parent of orchestrator).
-     */
-    protected function maestroRoot(): string
-    {
-        return dirname(base_path());
-    }
-
-    /**
-     * Get the path where the starter kit will be built.
-     */
-    protected function buildPath(): string
-    {
-        return $this->maestroRoot().'/build';
-    }
-
-    /**
-     * Get the path to a kit directory.
-     */
-    protected function kitPath(string $path = ''): string
-    {
-        return $this->maestroRoot().'/kits'.($path ? '/'.$path : '');
-    }
-
     /**
      * The name and signature of the console command.
      *
@@ -87,19 +61,34 @@ class BuildCommand extends Command
             $components = false;
         }
 
+        // Interactive prompts when no flags provided
         if (! $this->option('kit')) {
-            if ($kit === 'Livewire' && ! $workos && ! $components) {
-                $components = confirm(
-                    label: 'Would you like to build the Components variant?',
-                    default: false,
+            // Ask for auth variant (Fortify or WorkOS)
+            if (! $workos) {
+                $authVariant = select(
+                    label: 'Which authentication variant would you like to use?',
+                    options: [
+                        'fortify' => 'Fortify',
+                        'workos' => 'WorkOS',
+                    ],
+                    default: 'fortify',
                 );
+
+                $workos = $authVariant === 'workos';
             }
 
-            if (! $workos && ! $components) {
-                $workos = confirm(
-                    label: 'Would you like to build the WorkOS variant?',
-                    default: false,
+            // For Livewire with Fortify, ask for components variant
+            if ($kit === 'Livewire' && ! $workos && ! $components) {
+                $livewireVariant = select(
+                    label: 'Which Livewire variant would you like to use?',
+                    options: [
+                        'single' => 'Single File Components',
+                        'multiple' => 'Multiple File Components',
+                    ],
+                    default: 'single',
                 );
+
+                $components = $livewireVariant === 'multiple';
             }
         }
 
@@ -112,6 +101,30 @@ class BuildCommand extends Command
     }
 
     /**
+     * Get the root directory of the maestro project (parent of orchestrator).
+     */
+    protected function maestroRoot(): string
+    {
+        return dirname(base_path());
+    }
+
+    /**
+     * Get the path where the starter kit will be built.
+     */
+    protected function buildPath(): string
+    {
+        return $this->maestroRoot().'/build';
+    }
+
+    /**
+     * Get the path to a kit directory.
+     */
+    protected function kitPath(string $path = ''): string
+    {
+        return $this->maestroRoot().'/kits'.($path ? '/'.$path : '');
+    }
+
+    /**
      * Get the variant label for display.
      */
     protected function getVariantLabel(string $kit, bool $workos, bool $components): string
@@ -119,7 +132,7 @@ class BuildCommand extends Command
         return match (true) {
             $workos => "{$kit} (WorkOS)",
             $components => "{$kit} (Components)",
-            default => $kit,
+            default => "{$kit} (Fortify)",
         };
     }
 
@@ -181,8 +194,12 @@ class BuildCommand extends Command
 
         if ($workos) {
             $this->applyWorkosVariant($buildPath, 'Livewire');
-        } elseif ($components) {
-            $this->applyComponentsVariant($buildPath);
+        } else {
+            $this->applyFortifyVariant($buildPath, 'Livewire');
+
+            if ($components) {
+                $this->applyComponentsVariant($buildPath);
+            }
         }
 
         return $this->finalizeBuild($buildPath, 'Livewire', $workos, $components);
@@ -200,6 +217,8 @@ class BuildCommand extends Command
 
         if ($workos) {
             $this->applyWorkosVariant($buildPath, $kit);
+        } else {
+            $this->applyFortifyVariant($buildPath, $kit);
         }
 
         info('Replacing component placeholders...');
@@ -297,14 +316,35 @@ class BuildCommand extends Command
             File::copyDirectory($workosKitPath, $buildPath);
         }
 
-        info('Removing ignored files for WorkOS variant...');
-        $this->removeIgnoredFiles($buildPath, $kit);
-
         info('Adding WorkOS service configuration...');
         $this->addWorkosServiceConfig($buildPath);
 
         info('Adding WorkOS environment variables...');
         $this->addWorkosEnvVariables($buildPath);
+    }
+
+    /**
+     * Apply the Fortify auth variant modifications.
+     */
+    protected function applyFortifyVariant(string $buildPath, string $kit): void
+    {
+        if ($kit === 'Livewire') {
+            $fortifyPath = $this->kitPath('Livewire/Fortify');
+
+            info('Copying Fortify files...');
+            File::copyDirectory($fortifyPath, $buildPath);
+
+            return;
+        }
+
+        $fortifyBasePath = $this->kitPath('Inertia/Fortify/Base');
+        $fortifyKitPath = $this->kitPath("Inertia/Fortify/{$kit}");
+
+        info('Copying Fortify Base files...');
+        File::copyDirectory($fortifyBasePath, $buildPath);
+
+        info("Copying Fortify {$kit} files...");
+        File::copyDirectory($fortifyKitPath, $buildPath);
     }
 
     /**
@@ -365,66 +405,6 @@ class BuildCommand extends Command
         $content = File::get($fortifyPath);
         $content = str_replace('pages::auth.', 'livewire.auth.', $content);
         File::put($fortifyPath, $content);
-    }
-
-    /**
-     * Remove files listed in the workos.ignore config.
-     */
-    protected function removeIgnoredFiles(string $buildPath, string $kit): void
-    {
-        $ignoredPaths = config('maestro.workos.ignore', []);
-
-        foreach ($ignoredPaths as $path) {
-            $targetPath = $this->resolveIgnorePath($buildPath, $path, $kit);
-
-            if ($targetPath === null) {
-                continue;
-            }
-
-            if (File::exists($targetPath)) {
-                if (File::isDirectory($targetPath)) {
-                    File::deleteDirectory($targetPath);
-                } else {
-                    File::delete($targetPath);
-                }
-            }
-        }
-    }
-
-    /**
-     * Resolve the ignore path based on the kit type.
-     */
-    protected function resolveIgnorePath(string $buildPath, string $path, string $kit): ?string
-    {
-        $isVueFile = Str::endsWith($path, '.vue');
-        $isTsFile = Str::endsWith($path, '.ts') || Str::endsWith($path, '.tsx');
-        $isJsPath = Str::startsWith($path, 'resources/js/');
-
-        if ($kit === 'Livewire') {
-            // Skip Inertia-specific paths for Livewire
-            if ($isJsPath) {
-                return null;
-            }
-
-            return $buildPath.'/'.$path;
-        }
-
-        if ($kit === 'React') {
-            if ($isVueFile) {
-                $dirname = pathinfo($path, PATHINFO_DIRNAME);
-                $filename = pathinfo($path, PATHINFO_FILENAME);
-                $kebabFilename = Str::kebab($filename);
-                $path = $dirname.'/'.$kebabFilename.'.tsx';
-            } elseif (! $isTsFile) {
-                return $buildPath.'/'.$path;
-            }
-        } elseif ($kit === 'Vue') {
-            if ($isTsFile) {
-                return null;
-            }
-        }
-
-        return $buildPath.'/'.$path;
     }
 
     /**

@@ -34,12 +34,12 @@ function log(message, color = 'reset') {
  * Higher priority folders override lower priority ones.
  */
 const kitFolderMap = {
-    'livewire': ['Livewire/Base'],
-    'livewire-components': ['Livewire/Base', 'Livewire/Components'],
+    'livewire': ['Livewire/Base', 'Livewire/Fortify'],
+    'livewire-components': ['Livewire/Base', 'Livewire/Fortify', 'Livewire/Components'],
     'livewire-workos': ['Livewire/Base', 'Livewire/WorkOS'],
-    'react': ['Inertia/Base', 'Inertia/React'],
+    'react': ['Inertia/Base', 'Inertia/React', 'Inertia/Fortify/Base', 'Inertia/Fortify/React'],
     'react-workos': ['Inertia/Base', 'Inertia/React', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/React'],
-    'vue': ['Inertia/Base', 'Inertia/Vue'],
+    'vue': ['Inertia/Base', 'Inertia/Vue', 'Inertia/Fortify/Base', 'Inertia/Fortify/Vue'],
     'vue-workos': ['Inertia/Base', 'Inertia/Vue', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/Vue'],
 };
 
