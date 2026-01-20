@@ -34,13 +34,21 @@ function log(message, color = 'reset') {
  * Higher priority folders override lower priority ones.
  */
 const kitFolderMap = {
-    'livewire': ['Livewire/Base', 'Livewire/Fortify'],
-    'livewire-components': ['Livewire/Base', 'Livewire/Fortify', 'Livewire/Components'],
-    'livewire-workos': ['Livewire/Base', 'Livewire/WorkOS'],
-    'react': ['Inertia/Base', 'Inertia/React', 'Inertia/Fortify/Base', 'Inertia/Fortify/React'],
-    'react-workos': ['Inertia/Base', 'Inertia/React', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/React'],
-    'vue': ['Inertia/Base', 'Inertia/Vue', 'Inertia/Fortify/Base', 'Inertia/Fortify/Vue'],
-    'vue-workos': ['Inertia/Base', 'Inertia/Vue', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/Vue'],
+    // Livewire variants
+    'livewire-blank': ['Livewire/Blank'],
+    'livewire': ['Livewire/Blank', 'Livewire/Base', 'Livewire/Fortify'],
+    'livewire-components': ['Livewire/Blank', 'Livewire/Base', 'Livewire/Fortify', 'Livewire/Components'],
+    'livewire-workos': ['Livewire/Blank', 'Livewire/Base', 'Livewire/WorkOS'],
+
+    // React variants
+    'react-blank': ['Inertia/Blank/Base', 'Inertia/Blank/React'],
+    'react': ['Inertia/Blank/Base', 'Inertia/Blank/React', 'Inertia/Base', 'Inertia/React', 'Inertia/Fortify/Base', 'Inertia/Fortify/React'],
+    'react-workos': ['Inertia/Blank/Base', 'Inertia/Blank/React', 'Inertia/Base', 'Inertia/React', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/React'],
+
+    // Vue variants
+    'vue-blank': ['Inertia/Blank/Base', 'Inertia/Blank/Vue'],
+    'vue': ['Inertia/Blank/Base', 'Inertia/Blank/Vue', 'Inertia/Base', 'Inertia/Vue', 'Inertia/Fortify/Base', 'Inertia/Fortify/Vue'],
+    'vue-workos': ['Inertia/Blank/Base', 'Inertia/Blank/Vue', 'Inertia/Base', 'Inertia/Vue', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/Vue'],
 };
 
 /**

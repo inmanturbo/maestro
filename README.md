@@ -1,31 +1,56 @@
  <h1 align="center">Maestro</h1>
 <p align="center"><b>Laravel Starter Kit Orchestrator</b></p>
 
-## Contributing
+## Starter Kits
 
-To contribute to any of the Starter Kits, you need to apply changes to the files in the `kits` directory.
+We have two stacks of starter kits: **Inertia** and **Livewire**
 
-``` bash
-Inertia    # Inertia-based starter kits
-|__ Base   # Common files shared across all Inertia-based starter kits
-|__ React  # Specific files for React starter kit
-|__ Vue    # Specific files for Vue starter kit
-|__ WorkOS # Specific files for the WorkOS variant for the Inertia-base starter kits
-    |__ Base  # Common files shared across all WorkOS Intertia-based starter kits
-    |__ React # Specific files for WorkOS React starter kit
-    |__ Vue   # Specific files for WorkOS Vue starter kit
+For these stacks, we have ten different variations of starter kits:
 
-Livewire # Livewire-based starter kits
+### Livewire Starter Kits
+
+1. **Blank:** a minimal starter kit with no authentication scaffolding.
+2. **Fortify:** starter kit using *Laravel Fortify* for authentication.
+3. **Fortify (Multi-file Components):** the same as above, but having the view separated from the component code.
+4. **WorkOS:** starter kit using **[WorkOS](https://workos.com)** for authentication.
+
+### Inertia Starter Kits
+
+1. **Blank React:** a minimal *React* starter kit with no authentication scaffolding.
+2. **Fortify React:** *React* starter kit using *Laravel Fortify* for authentication.
+3. **WorkOS React:** *React* starter kit using **[WorkOS](https://workos.com)** for authentication.
+4. **Blank Vue:** a minimal *Vue* starter kit with no authentication scaffolding.
+5. **Fortify Vue:** *Vue* starter kit using *Laravel Fortify* for authentication.
+6. **WorkOS Vue:** *Vue* starter kit using **[WorkOS](https://workos.com)** for authentication.
+
+### Starter Kit Hierarchy
+
+The Starter Kits have a hierarchy for the files:
+
+```bash
+# INERTIA STARTER KITS
+Blank -> Base -> UI Layer (React/Vue) -> Auth Layer (Fortify/WorkOS)
+
+# LIVEWIRE STARTER KIT
+Blank -> Base -> Auth Layer (Fortify/WorkOS) -> Components (Fortify only variant)
 ```
 
-## Orhcestrator
+Where `Blank` has the shared files across all variants, and so on.
+
+When applying a change inside the `build` folder, **Maestro** is smart enough to know where that change should be
+replicated to, always preferring to apply the change to the customization, so if a file exists both in the
+`Blank` and the `Auth Layer`, the change is replicated to the `Auth Layer` by default.
+
+## Orchestrator
 
 The `orchestrator` is a simple Laravel application that's responsible for building and running the
-starter kits, so you can test and validate your changes.
+starter kits, so you can make changes to any of the Starter Kits.
+
+It streamlines the changes by replicating the changes made in the `build` folder - the Starter Kit you're running - to the
+`kits` folder where the files for the different Starter Kits live.
 
 ### Building a starter kit
 
-In order to validate and test your changes, you'll need to build the starter kit you're changing.
 Use this command to build:
 
 ```bash
@@ -33,15 +58,16 @@ php artisan build
 ```
 
 This will prompt you to build the starter kit you want. In alternative you can use the `--kit`
-parameter and the `--workos` flag to build directly:
+parameter and the `--workos`, `--components` or `--blank` flags to build directly:
 
 ```bash
-php artisan build --kit=vue # Builds the Vue starter kit
-php artisan build --kit=react --workos # Builds the WorkOS variant for the React starter kit
+php artisan build --kit=vue # Builds the Vue (Fortify) starter kit
+php artisan build --kit=react --workos # Builds the React (WorkOS) starter kit
+php artisan build --kit=livewire --blank # Builds Blank Livewire starter kit
 ```
 
 When building a **WorkOS** variant for a starter kit, you can add your **WorkOS** client ID and the
-API key in the root `.env` file, with this, when running `composer kit:run`, it will copy these
+API key in the `orchestrator/.env` file, with this, when running `composer kit:run`, it will copy these
 values to the built starter kit.
 
 ### Running the built starter kit
@@ -52,4 +78,5 @@ You can use this command to run the built starter kit at `http://localhost:8000`
 composer kit:run
 ```
 
-This will start both the development server and a file watcher that automatically copies changes from the kit folders to the `build` directory outside the `orchestrator` directory.
+This will start both the development server and a file watcher that automatically copies changes from the `build`
+folder to the correct `kits` ones.

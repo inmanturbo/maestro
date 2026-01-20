@@ -19,6 +19,7 @@ class BuildCommand extends Command
      */
     protected $signature = 'build
                             {--kit= : The starter kit to build (Livewire, React, or Vue)}
+                            {--blank : Build the Blank variant (no authentication)}
                             {--workos : Build the WorkOS variant}
                             {--components : Build the Livewire Components variant}';
 
@@ -52,33 +53,41 @@ class BuildCommand extends Command
 
         $workos = $this->option('workos');
         $components = $this->option('components');
+        $blank = $this->option('blank');
 
-        if ($components && $kit !== 'Livewire') {
+        // Apply flag priority: --workos > --components > --blank
+        if ($workos) {
+            $blank = false;
             $components = false;
+        } elseif ($components) {
+            $blank = false;
         }
 
-        if ($workos) {
+        // Components only applies to Livewire
+        if ($components && $kit !== 'Livewire') {
             $components = false;
         }
 
         // Interactive prompts when no flags provided
         if (! $this->option('kit')) {
-            // Ask for auth variant (Fortify or WorkOS)
-            if (! $workos) {
+            // Ask for auth variant (Blank, Fortify, or WorkOS)
+            if (! $workos && ! $blank) {
                 $authVariant = select(
-                    label: 'Which authentication variant would you like to use?',
+                    label: 'Which variant would you like to use?',
                     options: [
-                        'fortify' => 'Fortify',
-                        'workos' => 'WorkOS',
+                        'blank' => 'Blank (no authentication)',
+                        'fortify' => 'Fortify (authentication using Fortify)',
+                        'workos' => 'WorkOS (authentication using WorkOS)',
                     ],
                     default: 'fortify',
                 );
 
+                $blank = $authVariant === 'blank';
                 $workos = $authVariant === 'workos';
             }
 
             // For Livewire with Fortify, ask for components variant
-            if ($kit === 'Livewire' && ! $workos && ! $components) {
+            if ($kit === 'Livewire' && ! $workos && ! $blank && ! $components) {
                 $livewireVariant = select(
                     label: 'Which Livewire variant would you like to use?',
                     options: [
@@ -92,12 +101,12 @@ class BuildCommand extends Command
             }
         }
 
-        $variantLabel = $this->getVariantLabel($kit, $workos, $components);
+        $variantLabel = $this->getVariantLabel($kit, $workos, $components, $blank);
         info("Building {$variantLabel} starter kit...");
 
         return $kit === 'Livewire'
-            ? $this->buildLivewireKit($workos, $components)
-            : $this->buildInertiaKit($kit, $workos);
+            ? $this->buildLivewireKit($workos, $components, $blank)
+            : $this->buildInertiaKit($kit, $workos, $blank);
     }
 
     /**
@@ -127,9 +136,10 @@ class BuildCommand extends Command
     /**
      * Get the variant label for display.
      */
-    protected function getVariantLabel(string $kit, bool $workos, bool $components): string
+    protected function getVariantLabel(string $kit, bool $workos, bool $components, bool $blank = false): string
     {
         return match (true) {
+            $blank => "{$kit} (Blank)",
             $workos => "{$kit} (WorkOS)",
             $components => "{$kit} (Components)",
             default => "{$kit} (Fortify)",
@@ -164,7 +174,7 @@ class BuildCommand extends Command
         }
         File::makeDirectory($buildPath, 0755, true);
 
-        info('Copying Base kit files...');
+        info('Copying Blank kit files...');
         File::copyDirectory($basePath, $buildPath);
 
         return $buildPath;
@@ -173,12 +183,12 @@ class BuildCommand extends Command
     /**
      * Finalize the build by writing metadata and showing success message.
      */
-    protected function finalizeBuild(string $buildPath, string $kit, bool $workos, bool $components = false): int
+    protected function finalizeBuild(string $buildPath, string $kit, bool $workos, bool $components = false, bool $blank = false): int
     {
-        $this->writeStarterKitFile($kit, $workos, $components);
+        $this->writeStarterKitFile($kit, $workos, $components, $blank);
         $this->deleteDatabaseFile($buildPath);
 
-        $variantLabel = $this->getVariantLabel($kit, $workos, $components);
+        $variantLabel = $this->getVariantLabel($kit, $workos, $components, $blank);
         info("{$variantLabel} starter kit built successfully in the 'build' folder.");
         info("Run 'composer kit:run' to start the development server.");
 
@@ -188,37 +198,50 @@ class BuildCommand extends Command
     /**
      * Build the Livewire starter kit.
      */
-    protected function buildLivewireKit(bool $workos = false, bool $components = false): int
+    protected function buildLivewireKit(bool $workos = false, bool $components = false, bool $blank = false): int
     {
-        $buildPath = $this->prepareBuildDirectory($this->kitPath('Livewire/Base'));
+        $buildPath = $this->prepareBuildDirectory($this->kitPath('Livewire/Blank'));
 
-        if ($workos) {
-            $this->applyWorkosVariant($buildPath, 'Livewire');
-        } else {
-            $this->applyFortifyVariant($buildPath, 'Livewire');
+        if (! $blank) {
+            info('Copying Base kit files...');
+            File::copyDirectory($this->kitPath('Livewire/Base'), $buildPath);
 
-            if ($components) {
-                $this->applyComponentsVariant($buildPath);
+            if ($workos) {
+                $this->applyWorkosVariant($buildPath, 'Livewire');
+            } else {
+                $this->applyFortifyVariant($buildPath, 'Livewire');
+
+                if ($components) {
+                    $this->applyComponentsVariant($buildPath);
+                }
             }
         }
 
-        return $this->finalizeBuild($buildPath, 'Livewire', $workos, $components);
+        return $this->finalizeBuild($buildPath, 'Livewire', $workos, $components, $blank);
     }
 
     /**
      * Build an Inertia starter kit (React or Vue).
      */
-    protected function buildInertiaKit(string $kit, bool $workos = false): int
+    protected function buildInertiaKit(string $kit, bool $workos = false, bool $blank = false): int
     {
-        $buildPath = $this->prepareBuildDirectory($this->kitPath('Inertia/Base'));
+        $buildPath = $this->prepareBuildDirectory($this->kitPath('Inertia/Blank/Base'));
 
-        info("Copying {$kit} kit files...");
-        File::copyDirectory($this->kitPath("Inertia/{$kit}"), $buildPath);
+        info("Copying Blank {$kit} kit files...");
+        File::copyDirectory($this->kitPath("Inertia/Blank/{$kit}"), $buildPath);
 
-        if ($workos) {
-            $this->applyWorkosVariant($buildPath, $kit);
-        } else {
-            $this->applyFortifyVariant($buildPath, $kit);
+        if (! $blank) {
+            info('Copying Base kit files...');
+            File::copyDirectory($this->kitPath('Inertia/Base'), $buildPath);
+
+            info("Copying {$kit} kit files...");
+            File::copyDirectory($this->kitPath("Inertia/{$kit}"), $buildPath);
+
+            if ($workos) {
+                $this->applyWorkosVariant($buildPath, $kit);
+            } else {
+                $this->applyFortifyVariant($buildPath, $kit);
+            }
         }
 
         info('Replacing component placeholders...');
@@ -227,7 +250,7 @@ class BuildCommand extends Command
         info('Replacing variant placeholders...');
         $this->replaceVariantPlaceholder($buildPath, strtolower($kit));
 
-        return $this->finalizeBuild($buildPath, $kit, $workos);
+        return $this->finalizeBuild($buildPath, $kit, $workos, false, $blank);
     }
 
     /**
@@ -437,14 +460,15 @@ PHP;
     /**
      * Write the starter kit identifier file.
      */
-    protected function writeStarterKitFile(string $kit, bool $workos, bool $components = false): void
+    protected function writeStarterKitFile(string $kit, bool $workos, bool $components = false, bool $blank = false): void
     {
         $starterKit = strtolower($kit);
-        if ($workos) {
-            $starterKit .= '-workos';
-        } elseif ($components) {
-            $starterKit .= '-components';
-        }
+        $starterKit .= match (true) {
+            $blank => '-blank',
+            $workos => '-workos',
+            $components => '-components',
+            default => '',
+        };
 
         Storage::disk('local')->put('starter_kit', $starterKit);
     }
