@@ -6,9 +6,106 @@ on:
       - main
 
 jobs:
-  build-livewire:
-    name: Build Livewire Kit
+  build:
+    name: Build ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Livewire variants
+          - name: Livewire Kit
+            kit: Livewire
+            build_flags: ''
+            repository: laravel/livewire-starter-kit
+            path: livewire-starter-kit
+            branch: main
+            pr_branch: maestro-update
+            node: false
+
+          - name: Livewire Kit (Blank)
+            kit: Livewire
+            build_flags: '--blank'
+            repository: laravel/blank-livewire-starter-kit
+            path: blank-livewire-starter-kit
+            branch: main
+            pr_branch: maestro-update
+            node: false
+
+          - name: Livewire Kit (WorkOS)
+            kit: Livewire
+            build_flags: '--workos'
+            repository: laravel/livewire-starter-kit
+            path: livewire-starter-kit
+            branch: workos
+            pr_branch: maestro-update-workos
+            node: false
+
+          - name: Livewire Kit (Components)
+            kit: Livewire
+            build_flags: '--components'
+            repository: laravel/livewire-starter-kit
+            path: livewire-starter-kit
+            branch: components
+            pr_branch: maestro-update-components
+            node: false
+
+          # React variants
+          - name: React Kit
+            kit: React
+            build_flags: ''
+            repository: laravel/react-starter-kit
+            path: react-starter-kit
+            branch: main
+            pr_branch: maestro-update
+            node: true
+
+          - name: React Kit (Blank)
+            kit: React
+            build_flags: '--blank'
+            repository: laravel/blank-react-starter-kit
+            path: blank-react-starter-kit
+            branch: main
+            pr_branch: maestro-update
+            node: true
+
+          - name: React Kit (WorkOS)
+            kit: React
+            build_flags: '--workos'
+            repository: laravel/react-starter-kit
+            path: react-starter-kit
+            branch: workos
+            pr_branch: maestro-update-workos
+            node: true
+
+          # Vue variants
+          - name: Vue Kit
+            kit: Vue
+            build_flags: ''
+            repository: laravel/vue-starter-kit
+            path: vue-starter-kit
+            branch: main
+            pr_branch: maestro-update
+            node: true
+
+          - name: Vue Kit (Blank)
+            kit: Vue
+            build_flags: '--blank'
+            repository: laravel/blank-vue-starter-kit
+            path: blank-vue-starter-kit
+            branch: main
+            pr_branch: maestro-update
+            node: true
+
+          - name: Vue Kit (WorkOS)
+            kit: Vue
+            build_flags: '--workos'
+            repository: laravel/vue-starter-kit
+            path: vue-starter-kit
+            branch: workos
+            pr_branch: maestro-update-workos
+            node: true
+
     steps:
       - name: Checkout Maestro
         uses: actions/checkout@v5
@@ -23,288 +120,51 @@ jobs:
         working-directory: orchestrator
         run: composer install --no-interaction --prefer-dist
 
-      - name: Build Livewire Kit
+      - name: Build ${{ matrix.name }}
         working-directory: orchestrator
-        run: php artisan build --kit=Livewire
+        run: php artisan build --kit=${{ matrix.kit }} ${{ matrix.build_flags }}
 
-      - name: Checkout Livewire Starter Kit
+      - name: Checkout Starter Kit
         uses: actions/checkout@v5
         with:
-          repository: laravel/livewire-starter-kit
-          path: livewire-starter-kit
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.branch }}
+          path: ${{ matrix.path }}
           token: ${{ secrets.STARTER_KIT_TOKEN }}
 
-      - name: Copy Build to Livewire Starter Kit
+      - name: Copy Build to Starter Kit
         run: |
-          rm -rf livewire-starter-kit/*
-          cp -r build/* livewire-starter-kit/
-          cp -r build/.[!.]* livewire-starter-kit/ 2>/dev/null || true
+          rm -rf ${{ matrix.path }}/*
+          cp -r build/* ${{ matrix.path }}/
+          cp -r build/.[!.]* ${{ matrix.path }}/ 2>/dev/null || true
 
       - name: Check for Changes
         id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: livewire-starter-kit
-
-      - name: Install and Lint Livewire Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: livewire-starter-kit
+        working-directory: ${{ matrix.path }}
         run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-
-      - name: Create Pull Request for Livewire
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro'
-          title: 'Update from Maestro'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update
-          base: main
-
-  build-livewire-blank:
-    name: Build Livewire Kit (Blank)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build Livewire Kit (Blank)
-        working-directory: orchestrator
-        run: php artisan build --kit=Livewire --blank
-
-      - name: Checkout Blank Livewire Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/blank-livewire-starter-kit
-          path: blank-livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Blank Livewire Starter Kit
-        run: |
-          rm -rf blank-livewire-starter-kit/*
-          cp -r build/* blank-livewire-starter-kit/
-          cp -r build/.[!.]* blank-livewire-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: blank-livewire-starter-kit
-
-      - name: Install and Lint Livewire Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: blank-livewire-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-
-      - name: Create Pull Request for Livewire (Blank)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: blank-livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro'
-          title: 'Update from Maestro'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update
-          base: main
-
-  build-livewire-workos:
-    name: Build Livewire Kit (WorkOS)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build Livewire Kit (WorkOS)
-        working-directory: orchestrator
-        run: php artisan build --kit=Livewire --workos
-
-      - name: Checkout Livewire Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/livewire-starter-kit
-          ref: workos
-          path: livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Livewire Starter Kit
-        run: |
-          rm -rf livewire-starter-kit/*
-          cp -r build/* livewire-starter-kit/
-          cp -r build/.[!.]* livewire-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: livewire-starter-kit
-
-      - name: Install and Lint Livewire Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: livewire-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-
-      - name: Create Pull Request for Livewire (WorkOS)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro (WorkOS)'
-          title: 'Update from Maestro (WorkOS)'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update-workos
-          base: workos
-
-  build-livewire-components:
-    name: Build Livewire Kit (Components)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build Livewire Kit (Components)
-        working-directory: orchestrator
-        run: php artisan build --kit=Livewire --components
-
-      - name: Checkout Livewire Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/livewire-starter-kit
-          ref: components
-          path: livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Livewire Starter Kit
-        run: |
-          rm -rf livewire-starter-kit/*
-          cp -r build/* livewire-starter-kit/
-          cp -r build/.[!.]* livewire-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: livewire-starter-kit
-
-      - name: Install and Lint Livewire Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: livewire-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-
-      - name: Create Pull Request for Livewire (Components)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: livewire-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro (Components)'
-          title: 'Update from Maestro (Components)'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update-components
-          base: components
-
-  build-react:
-    name: Build React Kit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build React Kit
-        working-directory: orchestrator
-        run: php artisan build --kit=React
-
-      - name: Checkout React Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/react-starter-kit
-          path: react-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to React Starter Kit
-        run: |
-          rm -rf react-starter-kit/*
-          cp -r build/* react-starter-kit/
-          cp -r build/.[!.]* react-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: react-starter-kit
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "No changes detected, skipping PR creation."
+          fi
 
       - name: Setup Node.js
-        if: steps.changes.outputs.has_changes == 'true'
+        if: steps.changes.outputs.has_changes == 'true' && matrix.node
         uses: actions/setup-node@v4
         with:
           node-version: '22'
 
-      - name: Install and Lint React Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: react-starter-kit
+      - name: Install and Lint (Composer only)
+        if: steps.changes.outputs.has_changes == 'true' && !matrix.node
+        working-directory: ${{ matrix.path }}
+        run: |
+          composer install --no-interaction --prefer-dist
+          composer lint
+
+      - name: Install and Lint (Composer + Node)
+        if: steps.changes.outputs.has_changes == 'true' && matrix.node
+        working-directory: ${{ matrix.path }}
         run: |
           composer install --no-interaction --prefer-dist
           composer lint
@@ -312,11 +172,11 @@ jobs:
           npm run format
           npm run lint
 
-      - name: Create Pull Request for React
+      - name: Create Pull Request
         if: steps.changes.outputs.has_changes == 'true'
         uses: peter-evans/create-pull-request@v6
         with:
-          path: react-starter-kit
+          path: ${{ matrix.path }}
           token: ${{ secrets.STARTER_KIT_TOKEN }}
           commit-message: 'Update from Maestro'
           title: 'Update from Maestro'
@@ -324,362 +184,5 @@ jobs:
             This PR was automatically generated by Maestro.
 
             Triggered by commit: ${{ github.sha }}
-          branch: maestro-update
-          base: main
-
-  build-react-blank:
-    name: Build React Kit (Blank)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build React Kit (Blank)
-        working-directory: orchestrator
-        run: php artisan build --kit=React --blank
-
-      - name: Checkout Blank React Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/blank-react-starter-kit
-          path: blank-react-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Blank React Starter Kit
-        run: |
-          rm -rf blank-react-starter-kit/*
-          cp -r build/* blank-react-starter-kit/
-          cp -r build/.[!.]* blank-react-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: blank-react-starter-kit
-
-      - name: Setup Node.js
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install and Lint React Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: blank-react-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-          npm install
-          npm run format
-          npm run lint
-
-      - name: Create Pull Request for React (Blank)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: blank-react-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro'
-          title: 'Update from Maestro'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update
-          base: main
-
-  build-react-workos:
-    name: Build React Kit (WorkOS)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build React Kit (WorkOS)
-        working-directory: orchestrator
-        run: php artisan build --kit=React --workos
-
-      - name: Checkout React Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/react-starter-kit
-          ref: workos
-          path: react-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to React Starter Kit
-        run: |
-          rm -rf react-starter-kit/*
-          cp -r build/* react-starter-kit/
-          cp -r build/.[!.]* react-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: react-starter-kit
-
-      - name: Setup Node.js
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install and Lint React Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: react-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-          npm install
-          npm run format
-          npm run lint
-
-      - name: Create Pull Request for React (WorkOS)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: react-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro (WorkOS)'
-          title: 'Update from Maestro (WorkOS)'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update-workos
-          base: workos
-
-  build-vue:
-    name: Build Vue Kit
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build Vue Kit
-        working-directory: orchestrator
-        run: php artisan build --kit=Vue
-
-      - name: Checkout Vue Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/vue-starter-kit
-          path: vue-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Vue Starter Kit
-        run: |
-          rm -rf vue-starter-kit/*
-          cp -r build/* vue-starter-kit/
-          cp -r build/.[!.]* vue-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: vue-starter-kit
-
-      - name: Setup Node.js
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install and Lint Vue Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: vue-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-          npm install
-          npm run format
-          npm run lint
-
-      - name: Create Pull Request for Vue
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: vue-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro'
-          title: 'Update from Maestro'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update
-          base: main
-
-  build-vue-blank:
-    name: Build Vue Kit (Blank)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build Vue Kit (Blank)
-        working-directory: orchestrator
-        run: php artisan build --kit=Vue --blank
-
-      - name: Checkout Blank Vue Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/blank-vue-starter-kit
-          path: blank-vue-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Blank Vue Starter Kit
-        run: |
-          rm -rf blank-vue-starter-kit/*
-          cp -r build/* blank-vue-starter-kit/
-          cp -r build/.[!.]* blank-vue-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: blank-vue-starter-kit
-
-      - name: Setup Node.js
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install and Lint Vue Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: blank-vue-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-          npm install
-          npm run format
-          npm run lint
-
-      - name: Create Pull Request for Vue (Blank)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: blank-vue-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro'
-          title: 'Update from Maestro'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update
-          base: main
-
-  build-vue-workos:
-    name: Build Vue Kit (WorkOS)
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Maestro
-        uses: actions/checkout@v5
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: mbstring, xml, ctype, json, curl
-
-      - name: Install Composer Dependencies
-        working-directory: orchestrator
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Build Vue Kit (WorkOS)
-        working-directory: orchestrator
-        run: php artisan build --kit=Vue --workos
-
-      - name: Checkout Vue Starter Kit
-        uses: actions/checkout@v5
-        with:
-          repository: laravel/vue-starter-kit
-          ref: workos
-          path: vue-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-
-      - name: Copy Build to Vue Starter Kit
-        run: |
-          rm -rf vue-starter-kit/*
-          cp -r build/* vue-starter-kit/
-          cp -r build/.[!.]* vue-starter-kit/ 2>/dev/null || true
-
-      - name: Check for Changes
-        id: changes
-        uses: ./.github/actions/check-changes
-        with:
-          path: vue-starter-kit
-
-      - name: Setup Node.js
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Install and Lint Vue Kit
-        if: steps.changes.outputs.has_changes == 'true'
-        working-directory: vue-starter-kit
-        run: |
-          composer install --no-interaction --prefer-dist
-          composer lint
-          npm install
-          npm run format
-          npm run lint
-
-      - name: Create Pull Request for Vue (WorkOS)
-        if: steps.changes.outputs.has_changes == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          path: vue-starter-kit
-          token: ${{ secrets.STARTER_KIT_TOKEN }}
-          commit-message: 'Update from Maestro (WorkOS)'
-          title: 'Update from Maestro (WorkOS)'
-          body: |
-            This PR was automatically generated by Maestro.
-
-            Triggered by commit: ${{ github.sha }}
-          branch: maestro-update-workos
-          base: workos
+          branch: ${{ matrix.pr_branch }}
+          base: ${{ matrix.branch }}
