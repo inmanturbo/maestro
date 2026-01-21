@@ -52,6 +52,128 @@ const kitFolderMap = {
 };
 
 /**
+ * UI components mapping for placeholder restoration.
+ * Maps placeholder names to their kit-specific values.
+ * This mirrors the config/maestro.php ui_components configuration.
+ */
+const uiComponents = {
+    // Base
+    dashboard: {
+        react: 'dashboard',
+        vue: 'Dashboard',
+    },
+    welcome: {
+        react: 'welcome',
+        vue: 'Welcome',
+    },
+
+    // Auth
+    auth_confirm_password: {
+        react: 'auth/confirm-password',
+        vue: 'auth/ConfirmPassword',
+    },
+    auth_forgot_password: {
+        react: 'auth/forgot-password',
+        vue: 'auth/ForgotPassword',
+    },
+    auth_login: {
+        react: 'auth/login',
+        vue: 'auth/Login',
+    },
+    auth_register: {
+        react: 'auth/register',
+        vue: 'auth/Register',
+    },
+    auth_reset_password: {
+        react: 'auth/reset-password',
+        vue: 'auth/ResetPassword',
+    },
+    auth_two_factor_challenge: {
+        react: 'auth/two-factor-challenge',
+        vue: 'auth/TwoFactorChallenge',
+    },
+    auth_verify_email: {
+        react: 'auth/verify-email',
+        vue: 'auth/VerifyEmail',
+    },
+
+    // Settings
+    appearance_settings: {
+        react: 'settings/appearance',
+        vue: 'settings/Appearance',
+    },
+    password_settings: {
+        react: 'settings/password',
+        vue: 'settings/Password',
+    },
+    profile_settings: {
+        react: 'settings/profile',
+        vue: 'settings/Profile',
+    },
+    two_factor_settings: {
+        react: 'settings/two-factor',
+        vue: 'settings/TwoFactor',
+    },
+};
+
+/**
+ * Paths (relative to build) where placeholders should be restored.
+ * These match the searchPaths in BuildCommand.php replacePlaceholders method.
+ */
+const placeholderPaths = [
+    'app/Http/Controllers',
+    'app/Providers',
+    'routes',
+    'tests',
+];
+
+/**
+ * Get the kit type (react or vue) from the starter kit string.
+ * Returns null for livewire kits since they don't use placeholders.
+ */
+function getKitType(starterKit) {
+    if (starterKit.startsWith('react')) {
+        return 'react';
+    }
+    if (starterKit.startsWith('vue')) {
+        return 'vue';
+    }
+    return null;
+}
+
+function shouldRestorePlaceholders(relativePath) {
+    return placeholderPaths.some(p => relativePath.startsWith(p));
+}
+
+/**
+ * Restore placeholders in file content.
+ * This reverses the replacePlaceholders logic from BuildCommand.php.
+ */
+function restorePlaceholders(content, kitType) {
+    if (!kitType) {
+        return content;
+    }
+
+    let modified = content;
+
+    for (const [key, values] of Object.entries(uiComponents)) {
+        const replacement = values[kitType];
+        if (!replacement) {
+            continue;
+        }
+
+        const placeholder = `{{${key}}}`;
+
+        // Replace the kit-specific value back with the placeholder
+        if (modified.includes(replacement)) {
+            modified = modified.split(replacement).join(placeholder);
+        }
+    }
+
+    return modified;
+}
+
+/**
  * Recursively find all .gitignore files in a directory.
  */
 function findGitignoreFiles(dir, files = []) {
@@ -155,8 +277,9 @@ function findSourceKitFolder(relativePath, folders) {
 
 /**
  * Copy a file from build to the appropriate kit folder.
+ * Restores placeholders for files in placeholder paths.
  */
-function copyToKit(srcPath, relativePath, folders) {
+function copyToKit(srcPath, relativePath, folders, kitType) {
     // Find the highest-priority folder that has this file
     let targetFolder = findSourceKitFolder(relativePath, folders);
 
@@ -172,6 +295,19 @@ function copyToKit(srcPath, relativePath, folders) {
         if (!fs.existsSync(destDir)) {
             fs.mkdirSync(destDir, { recursive: true });
         }
+
+        // Check if we need to restore placeholders for this file
+        if (kitType && shouldRestorePlaceholders(relativePath)) {
+            const content = fs.readFileSync(srcPath, 'utf-8');
+            const restoredContent = restorePlaceholders(content, kitType);
+
+            if (content !== restoredContent) {
+                fs.writeFileSync(destPath, restoredContent);
+                log(`Copied (placeholders restored): ${relativePath} -> kits/${targetFolder}`, 'green');
+                return;
+            }
+        }
+
         fs.copyFileSync(srcPath, destPath);
         log(`Copied: ${relativePath} -> kits/${targetFolder}`, 'green');
     } catch (error) {
@@ -205,7 +341,7 @@ function deleteFromKit(relativePath, folders) {
 /**
  * Handle file change events from the build directory.
  */
-function handleFileChange(eventType, filePath, folders, ig) {
+function handleFileChange(eventType, filePath, folders, ig, kitType) {
     const relativePath = getRelativePath(filePath);
 
     // Skip files that match .gitignore patterns
@@ -218,7 +354,7 @@ function handleFileChange(eventType, filePath, folders, ig) {
         return;
     }
 
-    copyToKit(filePath, relativePath, folders);
+    copyToKit(filePath, relativePath, folders, kitType);
 }
 
 function startWatching() {
@@ -241,9 +377,15 @@ function startWatching() {
         process.exit(1);
     }
 
+    const kitType = getKitType(starterKit);
+
     log(`Watching build directory for ${starterKit} kit`, 'blue');
     log(`Changes will be copied to:`, 'blue');
     folders.forEach(folder => log(`  - kits/${folder}`, 'blue'));
+
+    if (kitType) {
+        log(`Placeholder restoration enabled for ${kitType} kit`, 'blue');
+    }
 
     const ig = loadGitignores();
 
@@ -254,9 +396,9 @@ function startWatching() {
     });
 
     watcher
-        .on('add', filePath => handleFileChange('add', filePath, folders, ig))
-        .on('change', filePath => handleFileChange('change', filePath, folders, ig))
-        .on('unlink', filePath => handleFileChange('unlink', filePath, folders, ig))
+        .on('add', filePath => handleFileChange('add', filePath, folders, ig, kitType))
+        .on('change', filePath => handleFileChange('change', filePath, folders, ig, kitType))
+        .on('unlink', filePath => handleFileChange('unlink', filePath, folders, ig, kitType))
         .on('ready', () => {
             log('Watcher ready. Waiting for changes in build directory...', 'green');
         })
