@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\StarterKit;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Storage;
@@ -35,7 +36,7 @@ class BuildCommand extends Command
      */
     public function handle(): int
     {
-        $availableKits = config('maestro.starter_kits');
+        $availableKits = StarterKit::values();
         $kit = $this->option('kit');
 
         if ($kit) {
@@ -254,11 +255,21 @@ class BuildCommand extends Command
     }
 
     /**
+     * Get the UI components configuration from the JSON file.
+     */
+    protected function getUiComponents(): array
+    {
+        $jsonPath = base_path('scripts/ui-components.json');
+
+        return json_decode(File::get($jsonPath), true);
+    }
+
+    /**
      * Replace all placeholders in the build folder.
      */
     protected function replacePlaceholders(string $buildPath, string $kit): void
     {
-        $uiComponents = config('maestro.ui_components');
+        $uiComponents = $this->getUiComponents();
 
         $searchPaths = [
             $buildPath.'/app/Http/Controllers',

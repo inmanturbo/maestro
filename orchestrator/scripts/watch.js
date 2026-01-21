@@ -13,6 +13,7 @@ const rootDir = path.dirname(orchestratorDir);
 const kitsDir = path.join(rootDir, 'kits');
 const buildDir = path.join(rootDir, 'build');
 const starterKitFile = path.join(orchestratorDir, 'storage', 'app', 'private', 'starter_kit');
+const uiComponentsFile = path.join(__dirname, 'ui-components.json');
 
 const colors = {
     reset: '\x1b[0m',
@@ -52,69 +53,12 @@ const kitFolderMap = {
 };
 
 /**
- * UI components mapping for placeholder restoration.
- * Maps placeholder names to their kit-specific values.
- * This mirrors the config/maestro.php ui_components configuration.
+ * Load UI components mapping from the JSON configuration file.
  */
-const uiComponents = {
-    // Base
-    dashboard: {
-        react: 'dashboard',
-        vue: 'Dashboard',
-    },
-    welcome: {
-        react: 'welcome',
-        vue: 'Welcome',
-    },
-
-    // Auth
-    auth_confirm_password: {
-        react: 'auth/confirm-password',
-        vue: 'auth/ConfirmPassword',
-    },
-    auth_forgot_password: {
-        react: 'auth/forgot-password',
-        vue: 'auth/ForgotPassword',
-    },
-    auth_login: {
-        react: 'auth/login',
-        vue: 'auth/Login',
-    },
-    auth_register: {
-        react: 'auth/register',
-        vue: 'auth/Register',
-    },
-    auth_reset_password: {
-        react: 'auth/reset-password',
-        vue: 'auth/ResetPassword',
-    },
-    auth_two_factor_challenge: {
-        react: 'auth/two-factor-challenge',
-        vue: 'auth/TwoFactorChallenge',
-    },
-    auth_verify_email: {
-        react: 'auth/verify-email',
-        vue: 'auth/VerifyEmail',
-    },
-
-    // Settings
-    appearance_settings: {
-        react: 'settings/appearance',
-        vue: 'settings/Appearance',
-    },
-    password_settings: {
-        react: 'settings/password',
-        vue: 'settings/Password',
-    },
-    profile_settings: {
-        react: 'settings/profile',
-        vue: 'settings/Profile',
-    },
-    two_factor_settings: {
-        react: 'settings/two-factor',
-        vue: 'settings/TwoFactor',
-    },
-};
+function loadUiComponents() {
+    const content = fs.readFileSync(uiComponentsFile, 'utf-8');
+    return JSON.parse(content);
+}
 
 /**
  * Paths (relative to build) where placeholders should be restored.
@@ -149,7 +93,7 @@ function shouldRestorePlaceholders(relativePath) {
  * Restore placeholders in file content.
  * This reverses the replacePlaceholders logic from BuildCommand.php.
  */
-function restorePlaceholders(content, kitType) {
+function restorePlaceholders(content, kitType, uiComponents) {
     if (!kitType) {
         return content;
     }
@@ -279,7 +223,7 @@ function findSourceKitFolder(relativePath, folders) {
  * Copy a file from build to the appropriate kit folder.
  * Restores placeholders for files in placeholder paths.
  */
-function copyToKit(srcPath, relativePath, folders, kitType) {
+function copyToKit(srcPath, relativePath, folders, kitType, uiComponents) {
     // Find the highest-priority folder that has this file
     let targetFolder = findSourceKitFolder(relativePath, folders);
 
@@ -299,7 +243,7 @@ function copyToKit(srcPath, relativePath, folders, kitType) {
         // Check if we need to restore placeholders for this file
         if (kitType && shouldRestorePlaceholders(relativePath)) {
             const content = fs.readFileSync(srcPath, 'utf-8');
-            const restoredContent = restorePlaceholders(content, kitType);
+            const restoredContent = restorePlaceholders(content, kitType, uiComponents);
 
             if (content !== restoredContent) {
                 fs.writeFileSync(destPath, restoredContent);
@@ -341,7 +285,7 @@ function deleteFromKit(relativePath, folders) {
 /**
  * Handle file change events from the build directory.
  */
-function handleFileChange(eventType, filePath, folders, ig, kitType) {
+function handleFileChange(eventType, filePath, folders, ig, kitType, uiComponents) {
     const relativePath = getRelativePath(filePath);
 
     // Skip files that match .gitignore patterns
@@ -354,7 +298,7 @@ function handleFileChange(eventType, filePath, folders, ig, kitType) {
         return;
     }
 
-    copyToKit(filePath, relativePath, folders, kitType);
+    copyToKit(filePath, relativePath, folders, kitType, uiComponents);
 }
 
 function startWatching() {
@@ -378,6 +322,7 @@ function startWatching() {
     }
 
     const kitType = getKitType(starterKit);
+    const uiComponents = kitType ? loadUiComponents() : null;
 
     log(`Watching build directory for ${starterKit} kit`, 'blue');
     log(`Changes will be copied to:`, 'blue');
@@ -396,9 +341,9 @@ function startWatching() {
     });
 
     watcher
-        .on('add', filePath => handleFileChange('add', filePath, folders, ig, kitType))
-        .on('change', filePath => handleFileChange('change', filePath, folders, ig, kitType))
-        .on('unlink', filePath => handleFileChange('unlink', filePath, folders, ig, kitType))
+        .on('add', filePath => handleFileChange('add', filePath, folders, ig, kitType, uiComponents))
+        .on('change', filePath => handleFileChange('change', filePath, folders, ig, kitType, uiComponents))
+        .on('unlink', filePath => handleFileChange('unlink', filePath, folders, ig, kitType, uiComponents))
         .on('ready', () => {
             log('Watcher ready. Waiting for changes in build directory...', 'green');
         })
