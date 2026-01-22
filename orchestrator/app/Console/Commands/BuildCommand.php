@@ -387,9 +387,6 @@ class BuildCommand extends Command
 
         info('Copying Components files...');
         File::copyDirectory($componentsPath, $buildPath);
-
-        info('Updating FortifyServiceProvider...');
-        $this->updateFortifyServiceProviderForComponents($buildPath);
     }
 
     /**
@@ -417,22 +414,6 @@ class BuildCommand extends Command
         if (File::exists($pagesPath)) {
             File::deleteDirectory($pagesPath);
         }
-    }
-
-    /**
-     * Update FortifyServiceProvider for the Components variant.
-     */
-    protected function updateFortifyServiceProviderForComponents(string $buildPath): void
-    {
-        $fortifyPath = $buildPath.'/app/Providers/FortifyServiceProvider.php';
-
-        if (! File::exists($fortifyPath)) {
-            return;
-        }
-
-        $content = File::get($fortifyPath);
-        $content = str_replace('pages::auth.', 'livewire.auth.', $content);
-        File::put($fortifyPath, $content);
     }
 
     /**
