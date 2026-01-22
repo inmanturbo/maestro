@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
-
 import AppearanceTabs from '@/components/AppearanceTabs.vue';
-import HeadingSmall from '@/components/HeadingSmall.vue';
+import Heading from '@/components/Heading.vue';
 import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { edit } from '@/routes/appearance';
 import { type BreadcrumbItem } from '@/types';
+import { Head } from '@inertiajs/vue3';
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -24,7 +23,8 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
         <SettingsLayout>
             <div class="space-y-6">
-                <HeadingSmall
+                <Heading
+                    variant="small"
                     title="Appearance settings"
                     description="Update your account's appearance settings"
                 />

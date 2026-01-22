@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { Form, Head } from '@inertiajs/vue3';
-
 import PasswordController from '@/actions/App/Http/Controllers/Settings/PasswordController';
-import HeadingSmall from '@/components/HeadingSmall.vue';
+import Heading from '@/components/Heading.vue';
 import InputError from '@/components/InputError.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +9,7 @@ import AppLayout from '@/layouts/AppLayout.vue';
 import SettingsLayout from '@/layouts/settings/Layout.vue';
 import { edit } from '@/routes/user-password';
 import { type BreadcrumbItem } from '@/types';
+import { Form, Head } from '@inertiajs/vue3';
 
 const breadcrumbItems: BreadcrumbItem[] = [
     {
@@ -28,7 +27,8 @@ const breadcrumbItems: BreadcrumbItem[] = [
 
         <SettingsLayout>
             <div class="space-y-6">
-                <HeadingSmall
+                <Heading
+                    variant="small"
                     title="Update password"
                     description="Ensure your account is using a long, random password to stay secure"
                 />
