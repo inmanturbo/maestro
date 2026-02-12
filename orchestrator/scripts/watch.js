@@ -47,6 +47,11 @@ const kitFolderMap = {
     'react': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/React', 'Shared/Base', 'Inertia/Base', 'Inertia/React', 'Shared/Fortify', 'Inertia/Fortify/Base', 'Inertia/Fortify/React'],
     'react-workos': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/React', 'Shared/Base', 'Inertia/Base', 'Inertia/React', 'Shared/WorkOS', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/React'],
 
+    // Svelte variants
+    'svelte-blank': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/Svelte'],
+    'svelte': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/Svelte', 'Shared/Base', 'Inertia/Base', 'Inertia/Svelte', 'Shared/Fortify', 'Inertia/Fortify/Base', 'Inertia/Fortify/Svelte'],
+    'svelte-workos': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/Svelte', 'Shared/Base', 'Inertia/Base', 'Inertia/Svelte', 'Shared/WorkOS', 'Inertia/WorkOS/Base', 'Inertia/WorkOS/Svelte'],
+
     // Vue variants
     'vue-blank': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/Vue'],
     'vue': ['Shared/Blank', 'Inertia/Blank/Base', 'Inertia/Blank/Vue', 'Shared/Base', 'Inertia/Base', 'Inertia/Vue', 'Shared/Fortify', 'Inertia/Fortify/Base', 'Inertia/Fortify/Vue'],
@@ -73,6 +78,10 @@ const placeholderPaths = [
     'tests',
 ];
 
+const allowedEmptyTextFiles = new Set([
+    'resources/js/app.js',
+]);
+
 /**
  * Get the kit type (react or vue) from the starter kit string.
  * Returns null for livewire kits since they don't use placeholders.
@@ -80,6 +89,9 @@ const placeholderPaths = [
 function getKitType(starterKit) {
     if (starterKit.startsWith('react')) {
         return 'react';
+    }
+    if (starterKit.startsWith('svelte')) {
+        return 'svelte';
     }
     if (starterKit.startsWith('vue')) {
         return 'vue';
@@ -231,6 +243,11 @@ function performInitialSync(folders, ig, kitType, uiComponents) {
         const destPath = path.join(kitsDir, targetFolder, relativePath);
         const processedContent = processFileContent(filePath, relativePath, targetFolder, kitType, uiComponents);
 
+        if (isBlockedEmptyTextSync(relativePath, processedContent, destPath)) {
+            log(`Blocked empty file sync: ${relativePath} -> kits/${targetFolder}`, 'red');
+            continue;
+        }
+
         // Skip if file hasn't changed
         if (!fileNeedsSync(filePath, destPath, processedContent)) {
             continue;
@@ -368,6 +385,37 @@ function isTextFile(relativePath) {
     return !relativePath.match(/\.(png|jpg|jpeg|gif|ico|woff|woff2|ttf|eot|svg)$/i);
 }
 
+function normalizePath(relativePath) {
+    return relativePath.replace(/\\/g, '/');
+}
+
+function isAllowedEmptyTextFile(relativePath) {
+    const normalizedPath = normalizePath(relativePath);
+    const fileName = path.basename(normalizedPath);
+
+    if (fileName === '.gitkeep') {
+        return true;
+    }
+
+    return allowedEmptyTextFiles.has(normalizedPath);
+}
+
+function isBlockedEmptyTextSync(relativePath, processedContent, destPath) {
+    if (processedContent === null || isAllowedEmptyTextFile(relativePath)) {
+        return false;
+    }
+
+    if (processedContent.trim() !== '') {
+        return false;
+    }
+
+    if (!fs.existsSync(destPath)) {
+        return true;
+    }
+
+    return fs.statSync(destPath).size > 0;
+}
+
 /**
  * Get the target kit folder for a file.
  * Returns the highest-priority folder that contains the file, or the highest-priority folder if not found.
@@ -430,6 +478,13 @@ function copyToKit(srcPath, relativePath, folders, kitType, uiComponents) {
 
     try {
         const processedContent = processFileContent(srcPath, relativePath, targetFolder, kitType, uiComponents);
+
+        if (isBlockedEmptyTextSync(relativePath, processedContent, destPath)) {
+            log(`Blocked empty file sync: ${relativePath} -> kits/${targetFolder}`, 'red');
+
+            return;
+        }
+
         writeToKit(srcPath, destPath, processedContent);
         log(`Copied: ${relativePath} -> kits/${targetFolder}`, 'green');
     } catch (error) {
