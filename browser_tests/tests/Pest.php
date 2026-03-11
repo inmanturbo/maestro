@@ -1,7 +1,7 @@
 <?php
 
-use Pest\Browser\Api\AwaitableWebpage;
-use Pest\Browser\Api\Webpage;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,8 +14,8 @@ use Pest\Browser\Api\Webpage;
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Browser');
 
 /*
@@ -43,14 +43,3 @@ expect()->extend('toBeOne', function () {
 | global functions to help you to reduce the number of lines of code in your test files.
 |
 */
-
-function visitPasswordProtectedPage(string $route, string $password = 'password'): AwaitableWebpage|Webpage
-{
-    $destinationUrl = route($route);
-
-    return visit($destinationUrl)
-        ->assertSee('Confirm password')
-        ->fill('password', $password)
-        ->press('@confirm-password-button')
-        ->assertUrlIs($destinationUrl);
-}

@@ -1,85 +1,47 @@
 #!/usr/bin/env node
 
-import { spawn, execSync } from 'child_process';
+import { execSync } from 'child_process';
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const orchestratorDir = path.dirname(__dirname);
-const rootDir = path.dirname(orchestratorDir);
-const buildDir = path.join(rootDir, 'build');
-const browserTestsDir = path.join(rootDir, 'browser_tests');
+import {
+    browserTestsDir,
+    buildDir,
+    log,
+    orchestratorDir,
+    removeBuildDirectory,
+    runInherit,
+    runMatrix,
+    runQuiet,
+} from './kit-helpers.js';
 
 const variants = [
     {
         key: 'livewire',
         display: 'Livewire',
+        framework: 'livewire',
         buildArgs: ['build', '--no-interaction', '--kit=Livewire'],
     },
     {
         key: 'react',
         display: 'React',
+        framework: 'react',
         buildArgs: ['build', '--no-interaction', '--kit=React'],
     },
     {
         key: 'svelte',
         display: 'Svelte',
+        framework: 'svelte',
         buildArgs: ['build', '--no-interaction', '--kit=Svelte'],
     },
     {
         key: 'vue',
         display: 'Vue',
+        framework: 'vue',
         buildArgs: ['build', '--no-interaction', '--kit=Vue'],
     },
 ];
 
-const colors = {
-    reset: '\x1b[0m',
-    blue: '\x1b[34m',
-    green: '\x1b[32m',
-    yellow: '\x1b[33m',
-    red: '\x1b[31m',
-};
-
-function log(message, color = 'reset') {
-    console.log(`${colors[color]}${message}${colors.reset}`);
-}
-
-function runCommand(command, args, options = {}) {
-    return new Promise((resolve, reject) => {
-        const child = spawn(command, args, {
-            stdio: 'inherit',
-            shell: true,
-            ...options,
-        });
-
-        child.on('close', code => {
-            if (code === 0) {
-                resolve();
-
-                return;
-            }
-
-            reject(new Error(`Command failed: ${command} ${args.join(' ')}`));
-        });
-
-        child.on('error', reject);
-    });
-}
-
-function removeBuildDirectory() {
-    if (!fs.existsSync(buildDir)) {
-        return;
-    }
-
-    log('Removing existing build directory...', 'yellow');
-    fs.rmSync(buildDir, { recursive: true, force: true });
-}
-
 function copyBrowserTests() {
-    log('Copying browser tests into build...', 'blue');
+    log('  Copying browser tests into build...', 'dim');
     fs.cpSync(browserTestsDir, buildDir, { recursive: true });
 }
 
@@ -102,54 +64,55 @@ function playwrightBrowsersInstalled() {
 
 async function ensurePlaywrightBrowsers() {
     if (playwrightBrowsersInstalled()) {
-        log('Playwright browsers already installed, skipping...', 'green');
+        log('  Playwright browsers already installed, skipping...', 'dim');
 
         return;
     }
 
-    log('Installing Playwright browsers...', 'blue');
-    await runCommand('npx', ['playwright', 'install', '--with-deps'], { cwd: buildDir });
+    log('  Installing Playwright browsers...', 'blue');
+    await runInherit('npx', ['playwright', 'install', '--with-deps'], { cwd: buildDir });
 }
 
 async function runBrowserTestsForCurrentBuild() {
-    await runCommand('composer', ['remove', '--dev', 'phpunit/phpunit', '--no-interaction', '--no-update'], { cwd: buildDir });
-    await runCommand('composer', ['require', '--dev', 'pestphp/pest', 'pestphp/pest-plugin-browser', 'pestphp/pest-plugin-laravel', '--no-interaction'], { cwd: buildDir });
-    await runCommand('npm', ['install'], { cwd: buildDir });
-    await runCommand('npm', ['install', 'playwright'], { cwd: buildDir });
+    log('  Configuring Pest + Playwright deps...', 'dim');
+    await runQuiet('composer', ['remove', '--dev', 'phpunit/phpunit', '--no-interaction', '--no-update'], { cwd: buildDir });
+    await runQuiet('composer', ['require', '--dev', 'pestphp/pest', 'pestphp/pest-plugin-browser', 'pestphp/pest-plugin-laravel', '--no-interaction'], { cwd: buildDir });
+
+    log('  Installing npm deps...', 'dim');
+    await runQuiet('npm', ['install'], { cwd: buildDir });
+    await runQuiet('npm', ['install', 'playwright'], { cwd: buildDir });
+
     await ensurePlaywrightBrowsers();
-    await runCommand('cp', ['.env.example', '.env'], { cwd: buildDir });
-    await runCommand('php', ['artisan', 'key:generate'], { cwd: buildDir });
-    await runCommand('npm', ['run', 'build'], { cwd: buildDir });
-    await runCommand('php', ['vendor/bin/pest', '--parallel'], { cwd: buildDir });
+
+    log('  Preparing environment...', 'dim');
+    await runQuiet('cp', ['.env.example', '.env'], { cwd: buildDir });
+    await runQuiet('php', ['artisan', 'key:generate'], { cwd: buildDir });
+
+    log('  Building frontend...', 'dim');
+    await runQuiet('npm', ['run', 'build'], { cwd: buildDir });
+
+    log('  Running browser tests...', 'blue');
+    await runInherit('php', ['vendor/bin/pest', '--parallel'], { cwd: buildDir });
 }
 
 async function browserTestVariant(variant, index, total) {
-    log(`\n[${index}/${total}] ${variant.display} (${variant.key})`, 'blue');
+    log(`\n[${index}/${total}] ${variant.display}`, 'blue');
 
     removeBuildDirectory();
 
-    log('Building variant...', 'blue');
-    await runCommand('php', ['artisan', ...variant.buildArgs], { cwd: orchestratorDir });
+    log('  Building variant...', 'dim');
+    await runQuiet('php', ['artisan', ...variant.buildArgs], { cwd: orchestratorDir });
 
     copyBrowserTests();
 
-    log('Running browser tests...', 'blue');
     await runBrowserTestsForCurrentBuild();
-
-    log(`Passed ${variant.key}`, 'green');
 }
 
-async function main() {
-    const total = variants.length;
-
-    for (let index = 0; index < total; index++) {
-        await browserTestVariant(variants[index], index + 1, total);
-    }
-
-    log('\nAll starter kit variants passed browser tests.', 'green');
-}
-
-main().catch(error => {
+runMatrix({
+    scriptLabel: 'kits:browser-tests',
+    allVariants: variants,
+    runVariant: browserTestVariant,
+}).catch(error => {
     log(`\nBrowser tests failed: ${error.message}`, 'red');
     process.exit(1);
 });
